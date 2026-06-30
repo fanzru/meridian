@@ -1,4 +1,7 @@
 import OpenAI from "openai";
+import { spawnSync } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
 import { jsonrepair } from "jsonrepair";
 import { buildSystemPrompt } from "./prompt.js";
 import { executeTool } from "./tools/executor.js";
@@ -91,13 +94,48 @@ import { getStateSummary } from "./state.js";
 import { getLessonsForPrompt, getPerformanceSummary } from "./lessons.js";
 import { getDecisionSummary } from "./decision-log.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const HERMES_CODEX_AUTH = ["1", "true", "yes", "on"].includes(String(process.env.HERMES_CODEX_AUTH || "").trim().toLowerCase());
+const HERMES_CODEX_BRIDGE = path.join(__dirname, "scripts", "hermes_codex_bridge.py");
+
 // Supports OpenRouter (default) or any OpenAI-compatible local server (e.g. LM Studio)
 // To use LM Studio: set LLM_BASE_URL=http://localhost:1234/v1 and LLM_API_KEY=lm-studio in .env
-const client = new OpenAI({
+const client = HERMES_CODEX_AUTH ? null : new OpenAI({
   baseURL: process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1",
   apiKey: process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY,
   timeout: 5 * 60 * 1000,
 });
+
+async function createLlmResponse(reqParams, sessionId = "") {
+  if (!HERMES_CODEX_AUTH) {
+    return client.chat.completions.create(reqParams);
+  }
+
+  const bridgeInput = {
+    ...reqParams,
+    session_id: sessionId || "meridian-hermes-codex",
+  };
+
+  const proc = spawnSync("python3", [HERMES_CODEX_BRIDGE], {
+    input: JSON.stringify(bridgeInput),
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+    cwd: __dirname,
+    env: process.env,
+  });
+
+  if (proc.error) throw proc.error;
+  if (proc.status !== 0) {
+    const stderr = (proc.stderr || "").trim();
+    throw new Error(`Hermes Codex bridge failed${stderr ? `: ${stderr}` : ""}`);
+  }
+
+  const stdout = (proc.stdout || "").trim();
+  if (!stdout) throw new Error("Hermes Codex bridge returned empty output");
+  return JSON.parse(stdout);
+}
 
 const DEFAULT_MODEL = process.env.LLM_MODEL || "openrouter/healer-alpha";
 
@@ -212,7 +250,7 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
             max_tokens: maxOutputTokens ?? config.llm.maxTokens,
           };
           if (!omitToolChoice) reqParams.tool_choice = toolChoice;
-          response = await client.chat.completions.create(reqParams);
+          response = await createLlmResponse(reqParams, `${agentType || "GENERAL"}:${step}:${usedModel}`);
         } catch (error) {
           if (providerMode === "system" && isSystemRoleError(error)) {
             providerMode = "user_embedded";

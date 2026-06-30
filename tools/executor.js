@@ -227,15 +227,12 @@ function normalizeConfigValue(key, value) {
     "screeningModel",
     "generalModel",
     "hiveMindUrl",
-    "hiveMindApiKey",
     "agentId",
     "hiveMindPullMode",
-    "publicApiKey",
     "agentMeridianApiUrl",
     "pnlSource",
     "pnlRpcUrl",
     "gmgnFeeSource",
-    "gmgnApiKey",
   ]);
   if (value === null) return null;
   if (booleanKeys.has(key)) return coerceBoolean(value, key);
@@ -433,11 +430,9 @@ const toolMap = {
       defaultBinsBelow: ["strategy", "defaultBinsBelow"],
       // hivemind
       hiveMindUrl: ["hiveMind", "url"],
-      hiveMindApiKey: ["hiveMind", "apiKey"],
       agentId: ["hiveMind", "agentId"],
       hiveMindPullMode: ["hiveMind", "pullMode"],
       // meridian api / relay
-      publicApiKey: ["api", "publicApiKey"],
       agentMeridianApiUrl: ["api", "url"],
       lpAgentRelayEnabled: ["api", "lpAgentRelayEnabled"],
       // pnl fetcher / poller
@@ -447,7 +442,6 @@ const toolMap = {
       pnlDepositCacheTtlSec: ["pnl", "depositCacheTtlSec", ["pnlDepositCacheTtlSec"]],
       // gmgn fee source
       gmgnFeeSource: ["gmgn", "feeSource", ["gmgnFeeSource"]],
-      gmgnApiKey: ["gmgn", "apiKey", ["gmgnApiKey"]],
       // chart indicators
       chartIndicatorsEnabled: ["indicators", "enabled", ["chartIndicators", "enabled"]],
       indicatorEntryPreset: ["indicators", "entryPreset", ["chartIndicators", "entryPreset"]],

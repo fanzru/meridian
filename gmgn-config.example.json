@@ -1,5 +1,5 @@
 {
-  "_note": "Optional. GMGN OpenAPI is used as the fee source for the minTokenFeesSol gate (more accurate than Jupiter's `fees`). Copy to gmgn-config.json and fill apiKey, or set GMGN_API_KEY in .env / gmgnApiKey in user-config.json. Set feeSource to \"jupiter\" to disable.",
+  "_note": "Optional. GMGN OpenAPI is used as the fee source for the minTokenFeesSol gate (more accurate than Jupiter's `fees`). Copy to gmgn-config.json for non-secret settings only; keep apiKey blank here and set GMGN_API_KEY in .env. Set feeSource to \"jupiter\" to disable.",
   "apiKey": "",
   "baseUrl": "https://openapi.gmgn.ai",
   "requestDelayMs": 2500,

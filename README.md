@@ -40,14 +40,14 @@ The harness also keeps a structured decision log in `decision-log.json` for depl
 - Pool screening API — fee/TVL ratios, volume, organic scores, holder counts
 - Jupiter API — token audit, mcap, launchpad, price stats
 
-Agents are powered via **OpenRouter** and can be swapped for any compatible model.
+Agents are powered via **OpenRouter** by default and can also run against any compatible OpenAI-style endpoint. Meridian now also supports **Hermes Codex OAuth** by reusing a local `hermes auth add openai-codex` login.
 
 ---
 
 ## Requirements
 
 - Node.js 18+
-- [OpenRouter](https://openrouter.ai) API key
+- Either an [OpenRouter](https://openrouter.ai) API key **or** a local Hermes login (`hermes auth add openai-codex`) for Codex OAuth
 - Solana wallet (base58 private key)
 - Solana RPC endpoint ([Helius](https://helius.xyz) recommended)
 - Telegram bot token (optional)
@@ -75,11 +75,11 @@ The wizard writes **both** files at the repo root:
 
 | Goes in `.env` | Goes in `user-config.json` |
 |---|---|
-| `WALLET_PRIVATE_KEY`, `OPENROUTER_API_KEY`, `RPC_URL`, `HELIUS_API_KEY` | Risk preset, deploy size, max positions |
+| `WALLET_PRIVATE_KEY`, `OPENROUTER_API_KEY`, `LLM_API_KEY`, `HERMES_CODEX_AUTH`, `RPC_URL`, `HELIUS_API_KEY` | Risk preset, deploy size, max positions |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ALLOWED_USER_IDS` | Strategy, screening filters, exit rules, trailing TP |
 | `DRY_RUN` | Position sizing, cycle intervals, per-role LLM models, `solMode` |
 
-`TELEGRAM_CHAT_ID` only needs to live in `.env` — setup also copies it to `user-config.json` when provided. Takes about 2 minutes.
+Secrets stay in `.env` only. Setup may mirror `TELEGRAM_CHAT_ID` into `user-config.json` for convenience, but wallet/API secrets are ignored outside `.env`. Takes about 2 minutes.
 
 **Or set up manually:**
 
@@ -92,10 +92,26 @@ OPENROUTER_API_KEY=sk-or-...
 HELIUS_API_KEY=your_helius_key          # for wallet balance lookups
 TELEGRAM_BOT_TOKEN=123456:ABC...        # optional — for notifications + chat
 TELEGRAM_CHAT_ID=                       # auto-filled on first message
-DRY_RUN=true                            # set false for live trading
+HIVEMIND_ENABLED=false                  # explicit opt-in for external sync
+JUPITER_REFERRAL_ACCOUNT=               # blank = disabled
+JUPITER_REFERRAL_FEE_BPS=0              # 0 = disabled
+DRY_RUN=true                            # keep true for first dry-run phase
 ```
 
-> Never put your private key or API keys in `user-config.json` — use `.env` only. Both files are gitignored.
+To use Hermes Codex OAuth instead of an API key:
+
+```bash
+hermes auth add openai-codex
+```
+
+```env
+HERMES_CODEX_AUTH=true
+LLM_MODEL=gpt-5.4
+```
+
+Leave `OPENROUTER_API_KEY` / `LLM_API_KEY` unused when `HERMES_CODEX_AUTH=true`.
+
+> Never put your private key or API keys in `user-config.json` or `gmgn-config.json` — use `.env` only. Both files are gitignored.
 
 Optional encrypted `.env` flow:
 
@@ -178,6 +194,7 @@ On startup, logs show `Repo: ... | cwd: ... | PM2 id: ...`. **Repo and cwd must 
 | `.env` changes ignored | Old PM2 env snapshot | `npm run pm2:restart` (`.env` now overrides stale PM2 env) |
 | Telegram `401 Unauthorized` | Invalid `TELEGRAM_BOT_TOKEN` (not chat ID) | Fix token in `.env`; if encrypted, ensure `.envrypt` exists |
 | Telegram commands ignored | Missing/wrong `TELEGRAM_CHAT_ID` | Set in `.env` (or `telegramChatId` in `user-config.json`) |
+| HiveMind still syncing when expected off | `HIVEMIND_ENABLED=true` still set in env/PM2 | Set `HIVEMIND_ENABLED=false` and restart PM2 |
 | Duplicate polling / 409 errors | `nohup node index.js` or second PM2 instance running | Kill stray processes; run only one PM2 app |
 | Encrypted env crash at boot | `# encrypted` lines without `.envrypt` key | Add `.envrypt` or use plain `.env` values |
 
@@ -525,24 +542,24 @@ All fields are optional — defaults shown. Edit `user-config.json`.
 
 ### Jupiter swap fee (referral)
 
-Every token swap the agent makes (auto-swap base→SOL after a close/claim, manual `swap_token`) goes through **Jupiter Ultra**. Jupiter's referral program lets a referral wallet collect a small fee, expressed in **basis points (bps)** — `1 bps = 0.01%`, so `50 bps = 0.5%`. Meridian ships with this enabled by default.
+Every token swap the agent makes (auto-swap base→SOL after a close/claim, manual `swap_token`) goes through **Jupiter Ultra**. Jupiter's referral program lets a referral wallet collect a small fee, expressed in **basis points (bps)** — `1 bps = 0.01%`, so `50 bps = 0.5%`. This hardened fork keeps referrals **disabled by default**.
 
 **Settings** (env only — *not* in `user-config.json`):
 
 | Env var | Default | Description |
 |---|---|---|
-| `JUPITER_REFERRAL_ACCOUNT` | built-in account | A **Jupiter referral account** (not just any wallet). Create one on the Jupiter referral dashboard (`referral.jup.ag`) — it generates a referral account and the per-token fee accounts that actually collect the fee. Paste that referral account address here to collect the fee yourself. |
-| `JUPITER_REFERRAL_FEE_BPS` | `50` | Fee in basis points. **Jupiter Ultra requires 50–255 bps** — values outside that range (or `0`) are ignored and the swap runs with no referral fee. |
+| `JUPITER_REFERRAL_ACCOUNT` | empty | A **Jupiter referral account** (not just any wallet). Create one on the Jupiter referral dashboard (`referral.jup.ag`) — it generates a referral account and the per-token fee accounts that actually collect the fee. Paste that referral account address here to collect the fee yourself. |
+| `JUPITER_REFERRAL_FEE_BPS` | `0` | Fee in basis points. **Jupiter Ultra requires 50–255 bps** — values outside that range (or `0`) are ignored and the swap runs with no referral fee. |
 
 ```bash
-# .env — collect the referral fee on your own Jupiter referral account
+# .env — opt in and collect the referral fee on your own Jupiter referral account
 JUPITER_REFERRAL_ACCOUNT=<your-jupiter-referral-account>
 JUPITER_REFERRAL_FEE_BPS=50
 ```
 
-**To turn the referral off**, just remove/blank it — set `JUPITER_REFERRAL_ACCOUNT=` (empty) **or** `JUPITER_REFERRAL_FEE_BPS=0`. Either one drops the referral and the swap proceeds at Jupiter's normal rate. The referral is also silently dropped if the fee is below `50`, above `255`, or the account isn't a valid Solana address (`tools/wallet.js#getJupiterReferralParams`). **`50` is the minimum Jupiter allows and the Meridian default.**
+**Referral stays off by default.** To keep it off, leave `JUPITER_REFERRAL_ACCOUNT=` empty or `JUPITER_REFERRAL_FEE_BPS=0`. The referral is also silently dropped if the fee is below `50`, above `255`, or the account isn't a valid Solana address (`tools/wallet.js#getJupiterReferralParams`). **`50` is the minimum Jupiter allows when you explicitly enable it.**
 
-> If you leave the referral enabled on the **built-in default account**, the fee goes toward **Meridian server maintenance** (HiveMind, Agent Meridian API, hosting). Override `JUPITER_REFERRAL_ACCOUNT` with your own Jupiter referral account to collect it yourself instead, or disable it entirely as above. Either way, on new tokens (<24h) it's the same 0.5% Jupiter charges regardless — so leaving the default on costs you nothing extra there.
+> If you enable the referral, point it at **your own Jupiter referral account** so the economics are explicit and under your control.
 
 > **Why 50 bps is effectively free on new tokens.** Jupiter's own platform fee already varies by pair — and for **new tokens (within 24h of token age) Jupiter charges 50 bps (0.5%)** on its UI regardless. So on those tokens the swap costs the same 0.5% **whether or not you attach a referral** — adding the referral just redirects that fee to your wallet instead of leaving it at Jupiter's default. (Jupiter's full platform-fee schedule: `0` bps buying Jupiter tokens / pegged LST-LST & stable-stable, `2` SOL-stable, `5` LST-stable, `10` everything else, `50` new tokens <24h.)
 
@@ -572,7 +589,7 @@ This analyzes closed position performance (win rate, avg PnL, fee yields) and au
 
 ## HiveMind
 
-HiveMind sync uses Agent Meridian at `https://api.agentmeridian.xyz` by default with the built-in public key. Agents can register, pull shared lessons/presets, and push learning events without a separate registration flow.
+HiveMind sync uses Agent Meridian at `https://api.agentmeridian.xyz` with the built-in public key, but this hardened fork keeps HiveMind **disabled by default** until you explicitly opt in.
 
 **What you get:**
 - Shared lessons from other Meridian agents
@@ -591,24 +608,43 @@ HiveMind failures are non-blocking. If Agent Meridian is unavailable, the agent 
 
 No manual HiveMind registration command is required for the shared Agent Meridian setup. `agentId` is generated automatically on startup if it is missing.
 
-To use a private HiveMind API key, check the Telegram announcement channel and set it as `hiveMindApiKey`.
+To enable HiveMind, set `HIVEMIND_ENABLED=true` in `.env` or set `"hiveMindEnabled": true` in `user-config.json`. To use a private HiveMind API key, check the Telegram announcement channel and set it as `HIVEMIND_API_KEY` in `.env`.
 
 Relevant config fields:
 
 ```json
 {
   "agentId": "",
+  "hiveMindEnabled": false,
   "hiveMindUrl": "",
-  "hiveMindApiKey": "",
   "hiveMindPullMode": "auto"
 }
 ```
 
-Blank `hiveMindUrl` and `hiveMindApiKey` values intentionally fall back to the Agent Meridian defaults. Set `hiveMindPullMode` to `manual` if you do not want shared lessons and presets pulled automatically.
+Blank `hiveMindUrl` still falls back to the Agent Meridian default URL, but no traffic is sent unless `hiveMindEnabled` / `HIVEMIND_ENABLED` is explicitly set to `true`. Keep any private HiveMind API key in `.env` as `HIVEMIND_API_KEY`. Set `hiveMindPullMode` to `manual` if you do not want shared lessons and presets pulled automatically.
 
 ### Disable
 
-There is currently no empty-string disable path for HiveMind; blank values fall back to the built-in Agent Meridian defaults. A true off switch should be implemented as an explicit config flag before documenting HiveMind as disabled by clearing fields.
+Set `HIVEMIND_ENABLED=false` (or `"hiveMindEnabled": false`) and restart the process. Clearing the URL or API key is no longer required for disabling it.
+
+---
+
+## Using Hermes Codex OAuth
+
+1. Authenticate once on the same machine:
+
+```bash
+hermes auth add openai-codex
+```
+
+2. Enable Meridian's bridge:
+
+```env
+HERMES_CODEX_AUTH=true
+LLM_MODEL=gpt-5.4
+```
+
+Meridian will resolve fresh Codex credentials from Hermes at request time, so it can reuse token refresh logic without storing a second API key in `.env`.
 
 ---
 

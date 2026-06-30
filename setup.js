@@ -232,7 +232,7 @@ const openrouterKey = await ask(
 
 const walletKey = await ask(
   "Wallet private key (base58)",
-  alreadySet(ev("WALLET_PRIVATE_KEY", existingConfig.walletKey || ""))
+  alreadySet(ev("WALLET_PRIVATE_KEY", ""))
 );
 
 const rpcUrl = await ask(
@@ -580,6 +580,13 @@ const LLM_PROVIDERS = [
     modelDefault: "gpt-4o",
   },
   {
+    label:   "Hermes Codex OAuth (reuse `hermes auth add openai-codex` login)",
+    key:     "hermes-codex",
+    baseUrl: "https://chatgpt.com/backend-api/codex",
+    keyHint: "(managed by Hermes auth; no API key here)",
+    modelDefault: "gpt-5.4",
+  },
+  {
     label:   "Local / LM Studio / Ollama (OpenAI-compatible)",
     key:     "local",
     baseUrl: "http://localhost:1234/v1",
@@ -603,8 +610,12 @@ if (provider.key === "local" || provider.key === "custom") {
   llmBaseUrl = await ask("Base URL", e("llmBaseUrl", provider.baseUrl || "http://localhost:1234/v1"));
 }
 
-const llmApiKeyExisting = e("llmApiKey", existingEnv.LLM_API_KEY || existingEnv.OPENROUTER_API_KEY || "");
-const llmApiKeyRaw = await ask("API Key", llmApiKeyExisting ? "*** (already set)" : (provider.keyHint || ""));
+const llmApiKeyExisting = provider.key === "openrouter"
+  ? (existingEnv.OPENROUTER_API_KEY || existingEnv.LLM_API_KEY || "")
+  : (provider.key === "hermes-codex" ? "" : (existingEnv.LLM_API_KEY || ""));
+const llmApiKeyRaw = provider.key === "hermes-codex"
+  ? ""
+  : await ask("API Key", llmApiKeyExisting ? "*** (already set)" : (provider.keyHint || ""));
 const llmApiKey   = llmApiKeyRaw.startsWith("***") ? llmApiKeyExisting : llmApiKeyRaw;
 
 const llmModel = await ask(
@@ -645,12 +656,18 @@ const isKept = (val) => !val || val.startsWith("***");
 
 const envMap = {
   ...existingEnv,
-  ...(isKept(openrouterKey) ? {} : { OPENROUTER_API_KEY: openrouterKey }),
-  ...(isKept(walletKey)     ? {} : { WALLET_PRIVATE_KEY: walletKey }),
-  ...(rpcUrl                ? { RPC_URL: rpcUrl } : {}),
-  ...(isKept(heliusKey)     ? {} : { HELIUS_API_KEY: heliusKey }),
+  HERMES_CODEX_AUTH: provider.key === "hermes-codex" ? "true" : "false",
+  ...(provider.key === "openrouter"
+    ? (!isKept(llmApiKey)
+        ? { OPENROUTER_API_KEY: llmApiKey }
+        : (isKept(openrouterKey) ? {} : { OPENROUTER_API_KEY: openrouterKey }))
+    : (isKept(openrouterKey) ? {} : { OPENROUTER_API_KEY: openrouterKey })),
+  ...(provider.key !== "openrouter" && provider.key !== "hermes-codex" && !isKept(llmApiKey) ? { LLM_API_KEY: llmApiKey } : {}),
+  ...(isKept(walletKey) ? {} : { WALLET_PRIVATE_KEY: walletKey }),
+  ...(rpcUrl ? { RPC_URL: rpcUrl } : {}),
+  ...(isKept(heliusKey) ? {} : { HELIUS_API_KEY: heliusKey }),
   ...(isKept(telegramToken) ? {} : { TELEGRAM_BOT_TOKEN: telegramToken }),
-  ...(telegramChatId        ? { TELEGRAM_CHAT_ID: telegramChatId } : {}),
+  ...(telegramChatId ? { TELEGRAM_CHAT_ID: telegramChatId } : {}),
   DRY_RUN: dryRun ? "true" : "false",
 };
 fs.writeFileSync(ENV_PATH, buildEnv(envMap));
@@ -716,7 +733,6 @@ const userConfig = {
   managementModel,
   screeningModel,
   generalModel,
-  ...(llmApiKey ? { llmApiKey } : {}),
   // Telegram — keep .env and user-config in sync
   telegramChatId: telegramChatId || process.env.TELEGRAM_CHAT_ID || existingConfig.telegramChatId || "",
   // Modes
@@ -729,6 +745,11 @@ delete userConfig.emergencyPriceDropPct;
 delete userConfig.takeProfitFeePct;
 delete userConfig.maxBundlePct;
 delete userConfig.athFilterPct;
+delete userConfig.walletKey;
+delete userConfig.llmApiKey;
+delete userConfig.publicApiKey;
+delete userConfig.gmgnApiKey;
+delete userConfig.hiveMindApiKey;
 
 fs.writeFileSync(CONFIG_PATH, JSON.stringify(userConfig, null, 2));
 

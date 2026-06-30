@@ -2,7 +2,6 @@
   "preset": "custom",
   "rpcUrl": "https://pump.helius-rpc.com",
   "llmBaseUrl": "",
-  "llmApiKey": "",
   "llmModel": "minimax/minimax-m2.7",
   "dryRun": true,
 
@@ -82,8 +81,8 @@
   "darwinMinSamples": 10,
 
   "agentId": "",
-  "publicApiKey": "",
   "agentMeridianApiUrl": "https://api.agentmeridian.xyz/api",
+  "hiveMindEnabled": false,
   "lpAgentRelayEnabled": false,
 
   "pnlSource": "rpc",
@@ -92,7 +91,6 @@
   "pnlDepositCacheTtlSec": 300,
 
   "gmgnFeeSource": "gmgn",
-  "gmgnApiKey": "",
 
   "chartIndicators": {
     "enabled": false,
@@ -107,6 +105,5 @@
   },
   "telegramChatId": "",
   "hiveMindUrl": "",
-  "hiveMindApiKey": "",
   "hiveMindPullMode": "auto"
 }

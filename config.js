@@ -32,26 +32,32 @@ const strategyDefaultBinsBelow = Math.max(
   Math.min(strategyMaxBinsBelow, Math.round(configuredDefaultBinsBelow)),
 );
 
-// Apply wallet/RPC from user-config if not already in env
-if (u.rpcUrl)    process.env.RPC_URL            ||= u.rpcUrl;
-if (u.walletKey) process.env.WALLET_PRIVATE_KEY ||= u.walletKey;
-if (u.llmModel)  process.env.LLM_MODEL          ||= u.llmModel;
-if (u.llmBaseUrl) process.env.LLM_BASE_URL      ||= u.llmBaseUrl;
-if (u.llmApiKey)  process.env.LLM_API_KEY       ||= u.llmApiKey;
+// Apply non-secret runtime config from user-config if not already in env.
+// Secrets stay env-only to avoid leaking into JSON config or backups.
+if (u.rpcUrl) process.env.RPC_URL ||= u.rpcUrl;
+if (u.llmModel) process.env.LLM_MODEL ||= u.llmModel;
+if (u.llmBaseUrl) process.env.LLM_BASE_URL ||= u.llmBaseUrl;
 if (u.dryRun !== undefined) process.env.DRY_RUN ||= String(u.dryRun);
-if (u.publicApiKey) process.env.PUBLIC_API_KEY ||= u.publicApiKey;
 if (u.agentMeridianApiUrl) process.env.AGENT_MERIDIAN_API_URL ||= u.agentMeridianApiUrl;
 if (u.telegramChatId) process.env.TELEGRAM_CHAT_ID ||= String(u.telegramChatId);
 
 const indicatorUserConfig = u.chartIndicators ?? {};
 
-// Optional standalone GMGN config file (mirrors user-config layering)
+// Optional standalone GMGN config file (mirrors user-config layering for non-secret settings)
 const GMGN_CONFIG_PATH = repoPath("gmgn-config.json");
 const gmgnUserConfig = fs.existsSync(GMGN_CONFIG_PATH)
   ? JSON.parse(fs.readFileSync(GMGN_CONFIG_PATH, "utf8"))
   : {};
-if (gmgnUserConfig.apiKey || u.gmgnApiKey) {
-  process.env.GMGN_API_KEY ||= gmgnUserConfig.apiKey || u.gmgnApiKey;
+
+const legacySecretKeys = [];
+if (u.walletKey) legacySecretKeys.push("walletKey");
+if (u.llmApiKey) legacySecretKeys.push("llmApiKey");
+if (u.publicApiKey) legacySecretKeys.push("publicApiKey");
+if (u.gmgnApiKey) legacySecretKeys.push("gmgnApiKey");
+if (u.hiveMindApiKey) legacySecretKeys.push("hiveMindApiKey");
+if (gmgnUserConfig.apiKey) legacySecretKeys.push("gmgn-config.json apiKey");
+if (legacySecretKeys.length) {
+  console.warn(`[meridian] Ignoring secret fields outside .env: ${legacySecretKeys.join(", ")}. Move secrets to .env.`);
 }
 
 function nonEmptyString(...values) {
@@ -179,15 +185,16 @@ export const config = {
 
   // ─── HiveMind ─────────────────────────
   hiveMind: {
-    url: nonEmptyString(u.hiveMindUrl, DEFAULT_HIVEMIND_URL),
-    apiKey: nonEmptyString(u.hiveMindApiKey, process.env.HIVEMIND_API_KEY, DEFAULT_HIVEMIND_API_KEY),
+    enabled: String(process.env.HIVEMIND_ENABLED ?? u.hiveMindEnabled ?? "false").trim().toLowerCase() === "true",
+    url: nonEmptyString(process.env.HIVEMIND_URL, u.hiveMindUrl, DEFAULT_HIVEMIND_URL),
+    apiKey: nonEmptyString(process.env.HIVEMIND_API_KEY, DEFAULT_HIVEMIND_API_KEY),
     agentId: u.agentId ?? null,
     pullMode: u.hiveMindPullMode ?? "auto",
   },
 
   api: {
     url: nonEmptyString(u.agentMeridianApiUrl, process.env.AGENT_MERIDIAN_API_URL, DEFAULT_AGENT_MERIDIAN_API_URL),
-    publicApiKey: nonEmptyString(u.publicApiKey, process.env.PUBLIC_API_KEY, DEFAULT_AGENT_MERIDIAN_PUBLIC_KEY),
+    publicApiKey: nonEmptyString(process.env.PUBLIC_API_KEY, DEFAULT_AGENT_MERIDIAN_PUBLIC_KEY),
     lpAgentRelayEnabled: u.lpAgentRelayEnabled ?? false,
   },
 
@@ -230,7 +237,7 @@ export const config = {
 
   // ─── GMGN (fee source for minTokenFeesSol gate) ──────────────
   gmgn: {
-    apiKey: nonEmptyString(gmgnUserConfig.apiKey, u.gmgnApiKey, process.env.GMGN_API_KEY),
+    apiKey: nonEmptyString(process.env.GMGN_API_KEY),
     baseUrl: nonEmptyString(gmgnUserConfig.baseUrl, u.gmgnBaseUrl, "https://openapi.gmgn.ai"),
     requestDelayMs: Number(gmgnUserConfig.requestDelayMs ?? u.gmgnRequestDelayMs ?? 2500),
     maxRetries: Number(gmgnUserConfig.maxRetries ?? u.gmgnMaxRetries ?? 2),
@@ -241,12 +248,8 @@ export const config = {
   jupiter: {
     // Internal Jupiter Ultra settings; override by env only, do not expose in user-config.
     apiKey: process.env.JUPITER_API_KEY ?? "",
-    referralAccount:
-      process.env.JUPITER_REFERRAL_ACCOUNT ??
-      "9MzhDUnq3KxecyPzvhguQMMPbooXQ3VAoCMPDnoijwey",
-    referralFeeBps: Number(
-      process.env.JUPITER_REFERRAL_FEE_BPS ?? 50,
-    ),
+    referralAccount: process.env.JUPITER_REFERRAL_ACCOUNT ?? "",
+    referralFeeBps: Number(process.env.JUPITER_REFERRAL_FEE_BPS ?? 0),
   },
 
   indicators: {
