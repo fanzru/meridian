@@ -49,7 +49,7 @@ Agents are powered via **OpenRouter** by default and can also run against any co
 - Node.js 18+
 - Either an [OpenRouter](https://openrouter.ai) API key **or** a local Hermes login (`hermes auth add openai-codex`) for Codex OAuth
 - Solana wallet (base58 private key)
-- Solana RPC endpoint ([Helius](https://helius.xyz) recommended)
+- Solana RPC endpoint (Helius, Alchemy, or any Solana JSON-RPC provider)
 - Telegram bot token (optional)
 - [Claude Code](https://claude.ai/code) CLI (optional, for terminal slash commands)
 
@@ -87,9 +87,9 @@ Create `.env`:
 
 ```env
 WALLET_PRIVATE_KEY=your_base58_private_key
-RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
-OPENROUTER_API_KEY=sk-or-...
-HELIUS_API_KEY=your_helius_key          # for wallet balance lookups
+RPC_URL=https://solana-mainnet.g.alchemy.com/v2/your_alchemy_api_key_here
+OPENROUTER_API_KEY=sk-or-...  # or use HERMES_CODEX_AUTH=true
+HELIUS_API_KEY=your_helius_key          # optional — wallet balance lookups only
 TELEGRAM_BOT_TOKEN=123456:ABC...        # optional — for notifications + chat
 TELEGRAM_CHAT_ID=                       # auto-filled on first message
 HIVEMIND_ENABLED=false                  # explicit opt-in for external sync
