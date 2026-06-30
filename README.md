@@ -75,7 +75,7 @@ The wizard writes **both** files at the repo root:
 
 | Goes in `.env` | Goes in `user-config.json` |
 |---|---|
-| `WALLET_PRIVATE_KEY`, `OPENROUTER_API_KEY`, `LLM_API_KEY`, `HERMES_CODEX_AUTH`, `RPC_URL`, `HELIUS_API_KEY` | Risk preset, deploy size, max positions |
+| `WALLET_PRIVATE_KEY`, `OPENROUTER_API_KEY`, `LLM_API_KEY`, `HERMES_CODEX_AUTH`, `RPC_PROVIDER`, `RPC_URL`, `HELIUS_API_KEY` | Risk preset, deploy size, max positions |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_ALLOWED_USER_IDS` | Strategy, screening filters, exit rules, trailing TP |
 | `DRY_RUN` | Position sizing, cycle intervals, per-role LLM models, `solMode` |
 
@@ -87,6 +87,7 @@ Create `.env`:
 
 ```env
 WALLET_PRIVATE_KEY=your_base58_private_key
+RPC_PROVIDER=alchemy
 RPC_URL=https://solana-mainnet.g.alchemy.com/v2/your_alchemy_api_key_here
 OPENROUTER_API_KEY=sk-or-...  # or use HERMES_CODEX_AUTH=true
 HELIUS_API_KEY=your_helius_key          # optional — wallet balance lookups only

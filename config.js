@@ -35,6 +35,7 @@ const strategyDefaultBinsBelow = Math.max(
 // Apply non-secret runtime config from user-config if not already in env.
 // Secrets stay env-only to avoid leaking into JSON config or backups.
 if (u.rpcUrl) process.env.RPC_URL ||= u.rpcUrl;
+if (u.rpcProvider) process.env.RPC_PROVIDER ||= u.rpcProvider;
 if (u.llmModel) process.env.LLM_MODEL ||= u.llmModel;
 if (u.llmBaseUrl) process.env.LLM_BASE_URL ||= u.llmBaseUrl;
 if (u.dryRun !== undefined) process.env.DRY_RUN ||= String(u.dryRun);

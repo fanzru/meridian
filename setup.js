@@ -235,6 +235,11 @@ const walletKey = await ask(
   alreadySet(ev("WALLET_PRIVATE_KEY", ""))
 );
 
+const rpcProviderChoice = await askChoice("Main RPC provider:", [
+  { label: "Alchemy", key: "alchemy" },
+  { label: "Helius", key: "helius" },
+], { defaultKey: ev("RPC_PROVIDER", e("rpcProvider", "alchemy")) || "alchemy" });
+
 const rpcUrl = await ask(
   "RPC URL",
   ev("RPC_URL", e("rpcUrl", "https://api.mainnet-beta.solana.com"))
@@ -664,6 +669,7 @@ const envMap = {
     : (isKept(openrouterKey) ? {} : { OPENROUTER_API_KEY: openrouterKey })),
   ...(provider.key !== "openrouter" && provider.key !== "hermes-codex" && !isKept(llmApiKey) ? { LLM_API_KEY: llmApiKey } : {}),
   ...(isKept(walletKey) ? {} : { WALLET_PRIVATE_KEY: walletKey }),
+  ...(rpcProviderChoice?.key ? { RPC_PROVIDER: rpcProviderChoice.key } : {}),
   ...(rpcUrl ? { RPC_URL: rpcUrl } : {}),
   ...(isKept(heliusKey) ? {} : { HELIUS_API_KEY: heliusKey }),
   ...(isKept(telegramToken) ? {} : { TELEGRAM_BOT_TOKEN: telegramToken }),
@@ -676,6 +682,7 @@ fs.writeFileSync(ENV_PATH, buildEnv(envMap));
 const userConfig = {
   ...existingConfig,
   preset: presetChoice.key,
+  rpcProvider: rpcProviderChoice.key,
   rpcUrl,
   // Deployment
   deployAmountSol,

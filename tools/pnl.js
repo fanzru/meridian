@@ -1,5 +1,6 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { config } from "../config.js";
+import { getRpcConnection } from "./rpc-provider.js";
 import { log } from "../logger.js";
 import {
   getTrackedPosition,
@@ -32,7 +33,7 @@ async function loadDlmmSdk() {
 let _pnlConnection = null;
 export function getPnlConnection() {
   if (!_pnlConnection) {
-    _pnlConnection = new Connection(config.pnl.rpcUrl, "confirmed");
+    _pnlConnection = getRpcConnection("pnl", config.pnl.rpcUrl);
   }
   return _pnlConnection;
 }
